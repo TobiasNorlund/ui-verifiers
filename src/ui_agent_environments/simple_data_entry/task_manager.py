@@ -69,6 +69,7 @@ class DataSheetBrowser:
 
     async def setup(self):
         self._browser = await self._playwright.chromium.launch(headless=False, args=[
+            "--ozone-platform=x11", # For --window-position to work on wayland
             f'--window-position={self._location[0]},{self._location[1]}',
         ])
         self._context = await self._browser.new_context(viewport={"width": self._size[0], "height": self._size[1]})
@@ -97,6 +98,7 @@ class FormBrowser:
 
     async def setup(self):
         self._browser = await self._playwright.chromium.launch(headless=False, args=[
+            "--ozone-platform=x11", # For --window-position to work on wayland
             f'--window-position={self._location[0]},{self._location[1]}',
         ])
         self._context = await self._browser.new_context(viewport={"width": self._size[0], "height": self._size[1]})
