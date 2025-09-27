@@ -18,7 +18,7 @@ class SimpleDataEntryTaskManager:
 
         # Get primary screen
         primary_screen = screeninfo.get_monitors()[0]
-        scaling_factor = 2
+        scaling_factor = float(os.environ.get("SCALING_FACTOR", "1"))
 
         # Open data sheet browser in left half of the primary screen
         self._data_sheet_browser = DataSheetBrowser(
@@ -71,8 +71,9 @@ class DataSheetBrowser:
         self._browser = await self._playwright.chromium.launch(headless=False, args=[
             "--ozone-platform=x11", # For --window-position to work on wayland
             f'--window-position={self._location[0]},{self._location[1]}',
+            f"--window-size={self._size[0]},{self._size[1]}"
         ])
-        self._context = await self._browser.new_context(viewport={"width": self._size[0], "height": self._size[1]})
+        self._context = await self._browser.new_context(no_viewport=True)
         self._page = await self._context.new_page()
         await self._page.goto("https://docs.google.com/spreadsheets/d/1wVwDmyx01J5_XSzdgkmxvOOHPLmZmsnq1YJ636XkwIA")
 
@@ -100,8 +101,9 @@ class FormBrowser:
         self._browser = await self._playwright.chromium.launch(headless=False, args=[
             "--ozone-platform=x11", # For --window-position to work on wayland
             f'--window-position={self._location[0]},{self._location[1]}',
+            f"--window-size={self._size[0]},{self._size[1]}"
         ])
-        self._context = await self._browser.new_context(viewport={"width": self._size[0], "height": self._size[1]})
+        self._context = await self._browser.new_context(no_viewport=True)
         self._page = await self._context.new_page()
         await self._page.goto("https://docs.google.com/forms/d/e/1FAIpQLSef9VSfp3ISD7jr5Kgxq2UDibrT82vUEilN8vIrhCIfH5YfQQ/viewform")
         self._page.on("request", self._on_form_browser_request)
