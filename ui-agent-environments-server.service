@@ -1,0 +1,13 @@
+[Unit]
+Description=UI Agent Environment
+After=graphical.target
+
+[Service]
+Type=simple
+Environment="DISPLAY=:0"
+WorkingDirectory=/home/ubuntu/ui-agent-environments
+ExecStart=/bin/bash -lc "uv run src/ui_agent_environments/simple_data_entry/server.py"
+Restart=always
+
+[Install]
+WantedBy=default.target
