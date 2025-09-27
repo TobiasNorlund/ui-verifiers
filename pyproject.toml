@@ -19,9 +19,13 @@ classifiers = [
 
 # Normal runtime dependencies
 dependencies = [
+  "fastapi>=0.117.1",
   "pandas>=2.3.2",
+  "pillow>=11.3.0",
   "playwright>=1.47",
+  "pyautogui>=0.9.54",
   "screeninfo>=0.8.1",
+  "uvicorn>=0.37.0",
 ]
 
 #[project.urls]
