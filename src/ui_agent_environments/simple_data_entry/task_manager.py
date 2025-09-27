@@ -1,6 +1,7 @@
 import asyncio
 import screeninfo
 import pandas as pd
+import os
 from playwright.async_api import Playwright, async_playwright
 
 
@@ -83,7 +84,7 @@ class DataSheetBrowser:
 
 class FormBrowser:
     def __init__(self, playwright: Playwright, location: tuple[int, int], size: tuple[int, int]):
-        self._sde_data = pd.read_csv("data.csv")
+        self._sde_data = pd.read_csv(os.path.join(os.path.dirname(__file__), "data.csv"))
         self._playwright = playwright
         self._location = location
         self._size = size
