@@ -3,9 +3,9 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ui-agent-environments"
+name = "ui-verifiers"
 version = "0.1.0"
-description = "Environments for RL training of UI Agents"
+description = "Verifiers for RL training of UI Agents"
 readme = "README.md"
 authors = [{ name = "Tobias Norlund" }]
 requires-python = ">=3.10"
@@ -23,7 +23,7 @@ dependencies = [
   "pandas>=2.3.2",
   "pillow>=11.3.0",
   "playwright>=1.47",
-  "pyautogui>=0.9.54",
+  "python-xlib>=0.33",
   "screeninfo>=0.8.1",
   "uvicorn>=0.37.0",
 ]
@@ -32,7 +32,7 @@ dependencies = [
 # Homepage = ""
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ui_agent_environments"]
+packages = ["src/ui_verifiers"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

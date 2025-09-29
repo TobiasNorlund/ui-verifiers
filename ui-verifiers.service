@@ -1,0 +1,12 @@
+[Unit]
+Description=UI Verifiers
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/ui-verifiers
+ExecStart=/bin/bash -lc "uv run src/ui_verifiers/simple_data_entry/server.py"
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,83 +1,84 @@
-import asyncio
-import screeninfo
-import pandas as pd
 import os
+import pandas as pd
+from ui_verifiers import GnomeSession
 from playwright.async_api import Playwright, async_playwright
 
 
-class SimpleDataEntryTaskManager:
 
-    def __init__(self,):
-        self._playwright = None
-        self._browser = None
-        self._data_sheet_browser = None
-        self._form_browser = None
+class SimpleDataEntrySession(GnomeSession):
 
-    async def setup(self):
+    def __init__(self, screen_width: int = 1280, screen_height: int = 800, **kwargs):
+        super().__init__(
+            screen_width=screen_width, 
+            screen_height=screen_height,
+            **kwargs
+        )
+        self._screen_width = screen_width
+        self._screen_height = screen_height
+
+    async def start(self):
+        await super().start()
+
         self._playwright = await async_playwright().start()
-
-        # Get primary screen
-        primary_screen = screeninfo.get_monitors()[0]
-        scaling_factor = float(os.environ.get("SCALING_FACTOR", "1"))
 
         # Open data sheet browser in left half of the primary screen
         self._data_sheet_browser = DataSheetBrowser(
             self._playwright, 
+            self._display,
             location=(0, 0),
-            size=(round(primary_screen.width / scaling_factor / 2), round(primary_screen.height / scaling_factor))
+            size=(round(self._screen_width / 2), self._screen_height)
         )
-        await self._data_sheet_browser.setup()
+        await self._data_sheet_browser.start()
 
         # Open form browser in right half of the screen
         self._form_browser = FormBrowser(
             self._playwright, 
-            location=(round(primary_screen.width / scaling_factor / 2), 0),
-            size=(round(primary_screen.width / scaling_factor / 2), round(primary_screen.height / scaling_factor))
+            self._display,
+            location=(round(self._screen_width / 2), 0),
+            size=(round(self._screen_width / 2), self._screen_height)
         )
-        await self._form_browser.setup()
+        await self._form_browser.start()
 
-    async def reset(self):
+    async def stop(self):
         # Close Playwright browser/resources.
-        if not self._browser and not self._playwright:
-            return
-
-        await self._data_sheet_browser.reset()
-        await self._form_browser.reset()
+        await self._data_sheet_browser.stop()
+        await self._form_browser.stop()
         await self._playwright.stop()
         
         self._playwright = None
         self._data_sheet_browser = None
         self._form_browser = None
 
-    @property
-    def is_setup(self) -> bool:
-        return self._playwright is not None
-
-    def get_progress(self):
-        return self._form_browser.num_correct_submissions, self._form_browser.num_incorrect_submissions
+        await super().stop()
 
 
 class DataSheetBrowser:
 
-    def __init__(self, playwright: Playwright, location: tuple[int, int], size: tuple[int, int]):
+    def __init__(self, playwright: Playwright, display: int, location: tuple[int, int], size: tuple[int, int]):
         self._playwright = playwright
+        self._display = display
         self._location = location
         self._size = size
         self._browser = None
         self._context = None
         self._page = None
 
-    async def setup(self):
-        self._browser = await self._playwright.chromium.launch(headless=False, args=[
-            "--ozone-platform=x11", # For --window-position to work on wayland
-            f'--window-position={self._location[0]},{self._location[1]}',
-            f"--window-size={self._size[0]},{self._size[1]}"
-        ])
+    async def start(self):
+        self._browser = await self._playwright.chromium.launch(
+            headless=False, 
+            args=[
+                f'--window-position={self._location[0]},{self._location[1]}',
+                f"--window-size={self._size[0]},{self._size[1]}",
+            ],
+            env={
+                'DISPLAY': f':{self._display}',
+            }
+        )
         self._context = await self._browser.new_context(no_viewport=True)
         self._page = await self._context.new_page()
         await self._page.goto("https://docs.google.com/spreadsheets/d/1wVwDmyx01J5_XSzdgkmxvOOHPLmZmsnq1YJ636XkwIA")
 
-    async def reset(self):
+    async def stop(self):
         await self._browser.close()
         self._page = None
         self._context = None
@@ -85,9 +86,10 @@ class DataSheetBrowser:
 
 
 class FormBrowser:
-    def __init__(self, playwright: Playwright, location: tuple[int, int], size: tuple[int, int]):
+    def __init__(self, playwright: Playwright, display: int, location: tuple[int, int], size: tuple[int, int]):
         self._sde_data = pd.read_csv(os.path.join(os.path.dirname(__file__), "data.csv"))
         self._playwright = playwright
+        self._display = display
         self._location = location
         self._size = size
         self._browser = None
@@ -97,18 +99,23 @@ class FormBrowser:
         self.num_correct_submissions = 0
         self.num_incorrect_submissions = 0
 
-    async def setup(self):
-        self._browser = await self._playwright.chromium.launch(headless=False, args=[
-            "--ozone-platform=x11", # For --window-position to work on wayland
-            f'--window-position={self._location[0]},{self._location[1]}',
-            f"--window-size={self._size[0]},{self._size[1]}"
-        ])
+    async def start(self):
+        self._browser = await self._playwright.chromium.launch(
+            headless=False, 
+            args=[
+                f'--window-position={self._location[0]},{self._location[1]}',
+                f"--window-size={self._size[0]},{self._size[1]}"
+            ],
+            env={
+                'DISPLAY': f':{self._display}',
+            }
+        )
         self._context = await self._browser.new_context(no_viewport=True)
         self._page = await self._context.new_page()
         await self._page.goto("https://docs.google.com/forms/d/e/1FAIpQLSef9VSfp3ISD7jr5Kgxq2UDibrT82vUEilN8vIrhCIfH5YfQQ/viewform")
         self._page.on("request", self._on_form_browser_request)
 
-    async def reset(self):
+    async def stop(self):
         await self._browser.close()
         self._page = None
         self._context = None
@@ -129,9 +136,17 @@ class FormBrowser:
 
 
 if __name__ == "__main__":
+    import asyncio
     async def main():
-        sde_task_manager = SimpleDataEntryTaskManager()
-        await sde_task_manager.setup()
-        await asyncio.sleep(100)
-        await sde_task_manager.reset()
+        session = SimpleDataEntrySession(display=10)
+        print("Session starting...")
+        await session.start()
+        print("Session started")
+        await asyncio.sleep(2)
+        img = await session.screenshot()
+        img.save("screenshot.png")
+        await asyncio.sleep(30)
+        await session.stop()
+        print("Session stopped")
+
     asyncio.run(main())
