@@ -31,6 +31,9 @@ dependencies = [
 #[project.urls]
 # Homepage = ""
 
+[tool.hatch.build]
+include = ["ui_verifiers/**", "README.md", "pyproject.toml"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["ui_verifiers"]
 
