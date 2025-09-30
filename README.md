@@ -9,6 +9,8 @@ Implements infrastructure and verifiable desktop tasks for scaling training of U
 
 ## UI Verifiers Server
 
+**Note:** This has to be run on a machine with `Xvfb` and `gnome-session` available.
+
 Launch the server locally with:
 
 ```bash
