@@ -32,7 +32,7 @@ dependencies = [
 # Homepage = ""
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ui_verifiers"]
+packages = ["ui_verifiers"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
@@ -43,7 +43,7 @@ line-length = 100
 [tool.mypy]
 python_version = "3.10"
 strict = true
-packages = ["ui_agent_environments"]
+packages = ["ui_verifiers"]
 
 [dependency-groups]
 dev = [
