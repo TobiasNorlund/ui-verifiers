@@ -8,7 +8,20 @@ from typing import Optional, Dict
 from .computer import Computer
 
 
-class GnomeSession(Computer):
+class Session(Computer):
+
+    def start(self):
+        raise NotImplementedError()
+
+    def stop(self):
+        raise NotImplementedError()
+
+    def get_progress(self) -> Dict:
+        raise NotImplementedError()
+
+
+
+class GnomeSession(Session):
 
     def __init__(self, display: int, screen_width: int = 1280, screen_height: int = 800, color_depth: int = 24):
         self._display = display

@@ -1,1 +1,1 @@
-from .gnome_session import GnomeSession
+from .session import GnomeSession
