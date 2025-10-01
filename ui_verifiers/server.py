@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from enum import StrEnum
 from io import BytesIO
+from importlib.metadata import version
 from fastapi import HTTPException, Depends
 from fastapi.responses import Response
 from .computer import ActionType, Computer
@@ -45,7 +46,7 @@ class SessionInfo(pydantic.BaseModel):
 
 @app.get("/")
 async def root():
-    return Response(content="UI Verifiers Server", media_type="text/plain")
+    return Response(content=f"UI Verifiers Server v{version("ui-verifiers")}", media_type="text/plain")
 
 
 @app.get("/status")
