@@ -4,8 +4,9 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ubuntu/ui-verifiers
-ExecStart=/bin/bash -lc "uv run uvicorn ui_verifiers.server:app --host 0.0.0.0"
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/home/ubuntu/launch-server.sh
 Restart=always
 
 [Install]
