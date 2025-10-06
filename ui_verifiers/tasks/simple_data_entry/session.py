@@ -2,57 +2,49 @@ import os
 import contextlib
 import asyncio
 import pandas as pd
-from ui_verifiers.session import GnomeSession
+#from ui_verifiers.session import GnomeSession
 from playwright.async_api import Playwright, async_playwright, Error
 
 
 
-class SimpleDataEntrySession(GnomeSession):
+class SimpleDataEntrySession:
 
-    def __init__(self, screen_width: int = 1280, screen_height: int = 800, **kwargs):
-        super().__init__(
-            screen_width=screen_width, 
-            screen_height=screen_height,
-            **kwargs
-        )
+    def __init__(self, screen_width: int = 1280, screen_height: int = 800, display: int = 1):
         self._screen_width = screen_width
         self._screen_height = screen_height
+        self._display = display
 
     async def start(self):
-        for attempt in range(3):
-            try:
-                await super().start()
+        #for attempt in range(3):
+            #try:
+        self._playwright = await async_playwright().start()
 
-                self._playwright = await async_playwright().start()
+        # Open data sheet browser in left half of the primary screen
+        self._data_sheet_browser = DataSheetBrowser(
+            self._playwright,
+            self._display,
+            location=(0, 0),
+            size=(round(self._screen_width / 2), self._screen_height)
+        )
+        await self._data_sheet_browser.start()
 
-                # Open data sheet browser in left half of the primary screen
-                self._data_sheet_browser = DataSheetBrowser(
-                    self._playwright,
-                    self._display,
-                    location=(0, 0),
-                    size=(round(self._screen_width / 2), self._screen_height)
-                )
-                await self._data_sheet_browser.start()
+        # Open form browser in right half of the screen
+        self._form_browser = FormBrowser(
+            self._playwright,
+            self._display,
+            location=(round(self._screen_width / 2), 0),
+            size=(round(self._screen_width / 2), self._screen_height)
+        )
+        await self._form_browser.start()
 
-                # Open form browser in right half of the screen
-                self._form_browser = FormBrowser(
-                    self._playwright,
-                    self._display,
-                    location=(round(self._screen_width / 2), 0),
-                    size=(round(self._screen_width / 2), self._screen_height)
-                )
-                await self._form_browser.start()
-
-                # success
-                return
-            except Exception as exc:
-                # best-effort cleanup before retry
-                with contextlib.suppress(Exception):
-                    await self.stop()
-                if attempt < 2:
-                    await asyncio.sleep(1.0)
-                else:
-                    raise
+        # except Exception as exc:
+        #     # best-effort cleanup before retry
+        #     with contextlib.suppress(Exception):
+        #         await self.stop()
+        #     if attempt < 2:
+        #         await asyncio.sleep(1.0)
+        #     else:
+        #         raise
 
     async def stop(self):
         # Close Playwright browser/resources.
@@ -69,8 +61,6 @@ class SimpleDataEntrySession(GnomeSession):
         self._playwright = None
         self._data_sheet_browser = None
         self._form_browser = None
-
-        await super().stop()
 
 
 class DataSheetBrowser:
