@@ -35,7 +35,7 @@ Xvfb :1 -ac -screen 0 1280x800x24 -dpi 96 -nolisten tcp &
 pids+=($!)
 
 # Run x11vnc with limited ulimit, due to a bug (slow when client connects) 
-(ulimit -n 1024; x11vnc -display :1) &
+(ulimit -n 1024; x11vnc -display :1 -forever) &
 pids+=($!)
 
 # Start openbox
