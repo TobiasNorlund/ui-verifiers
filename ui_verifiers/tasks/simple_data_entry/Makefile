@@ -4,5 +4,5 @@ build:
 	docker build -t ui-verifiers/simple-data-entry .
 
 run:
-	docker run --rm --name simple-data-entry -p 5901:5901 ui-verifiers/simple-data-entry
+	docker run --rm -it -p 5900:5900 -p 8000:8000 --name simple-data-entry ui-verifiers/simple-data-entry
 

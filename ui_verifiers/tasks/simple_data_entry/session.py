@@ -2,49 +2,34 @@ import os
 import contextlib
 import asyncio
 import pandas as pd
-#from ui_verifiers.session import GnomeSession
-from playwright.async_api import Playwright, async_playwright, Error
-
+from playwright.async_api import Playwright, async_playwright
 
 
 class SimpleDataEntrySession:
 
-    def __init__(self, screen_width: int = 1280, screen_height: int = 800, display: int = 1):
-        self._screen_width = screen_width
-        self._screen_height = screen_height
+    def __init__(self, display: int = 1):
         self._display = display
 
     async def start(self):
-        #for attempt in range(3):
-            #try:
         self._playwright = await async_playwright().start()
 
         # Open data sheet browser in left half of the primary screen
         self._data_sheet_browser = DataSheetBrowser(
             self._playwright,
             self._display,
-            location=(0, 0),
-            size=(round(self._screen_width / 2), self._screen_height)
         )
         await self._data_sheet_browser.start()
+        # Move to left side
+        os.system("xdotool key Super_L+Left")
 
         # Open form browser in right half of the screen
         self._form_browser = FormBrowser(
             self._playwright,
-            self._display,
-            location=(round(self._screen_width / 2), 0),
-            size=(round(self._screen_width / 2), self._screen_height)
+            self._display
         )
         await self._form_browser.start()
-
-        # except Exception as exc:
-        #     # best-effort cleanup before retry
-        #     with contextlib.suppress(Exception):
-        #         await self.stop()
-        #     if attempt < 2:
-        #         await asyncio.sleep(1.0)
-        #     else:
-        #         raise
+        # Move to right
+        os.system("xdotool key Super_L+Right")
 
     async def stop(self):
         # Close Playwright browser/resources.
@@ -62,25 +47,25 @@ class SimpleDataEntrySession:
         self._data_sheet_browser = None
         self._form_browser = None
 
+    def get_progress(self):
+        return {
+            "num_correct_submissions": self._form_browser.num_correct_submissions, 
+            "num_incorrect_submissions": self._form_browser.num_incorrect_submissions
+        }
+
 
 class DataSheetBrowser:
 
-    def __init__(self, playwright: Playwright, display: int, location: tuple[int, int], size: tuple[int, int]):
+    def __init__(self, playwright: Playwright, display: int):
         self._playwright = playwright
         self._display = display
-        self._location = location
-        self._size = size
         self._browser = None
         self._context = None
         self._page = None
 
     async def start(self):
         self._browser = await self._playwright.chromium.launch(
-            headless=False, 
-            args=[
-                f'--window-position={self._location[0]},{self._location[1]}',
-                f"--window-size={self._size[0]},{self._size[1]}",
-            ],
+            headless=False,
             env={
                 'DISPLAY': f':{self._display}',
             }
@@ -97,12 +82,10 @@ class DataSheetBrowser:
 
 
 class FormBrowser:
-    def __init__(self, playwright: Playwright, display: int, location: tuple[int, int], size: tuple[int, int]):
+    def __init__(self, playwright: Playwright, display: int):
         self._sde_data = pd.read_csv(os.path.join(os.path.dirname(__file__), "data.csv"))
         self._playwright = playwright
         self._display = display
-        self._location = location
-        self._size = size
         self._browser = None
         self._context = None
         self._page = None
@@ -112,11 +95,7 @@ class FormBrowser:
 
     async def start(self):
         self._browser = await self._playwright.chromium.launch(
-            headless=False, 
-            args=[
-                f'--window-position={self._location[0]},{self._location[1]}',
-                f"--window-size={self._size[0]},{self._size[1]}"
-            ],
+            headless=False,
             env={
                 'DISPLAY': f':{self._display}',
             }
@@ -149,7 +128,7 @@ class FormBrowser:
 if __name__ == "__main__":
     import asyncio
     async def main():
-        session = SimpleDataEntrySession(display=10)
+        session = SimpleDataEntrySession(display=1)
         print("Session starting...")
         await session.start()
         print("Session started")

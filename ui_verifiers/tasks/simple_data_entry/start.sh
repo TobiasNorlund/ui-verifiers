@@ -1,62 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Defaults (can be overridden by environment)
-: "${DISPLAY:=:1}"
-: "${DISPLAY_GEOMETRY:=1280x800}"
-: "${DISPLAY_DEPTH:=24}"
-: "${VNC_PASSWORD:=ui-verifiers}"
+export DISPLAY=:1
 
-export USERNAME="${USER:-ui-verifiers}"
-export HOME_DIR="${HOME:-/home/ui-verifiers}"
+# Array to store background process PIDs
+pids=()
 
-mkdir -p "${HOME_DIR}/.vnc"
+# Function to cleanup background processes
+cleanup() {
+    echo "Received signal, cleaning up..."
+    for pid in "${pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "Killing process $pid"
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
+    # Wait a bit for processes to terminate gracefully
+    sleep 1
+    # Force kill any remaining processes
+    for pid in "${pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "Force killing process $pid"
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    done
+    exit 0
+}
 
-# Configure VNC password non-interactively on every start (support both tigervnc and tightvnc variants)
-VNC_PASSWD_BIN="$(command -v vncpasswd || true)"
-printf "%s\n" "${VNC_PASSWORD}" | "${VNC_PASSWD_BIN}" -f > "${HOME_DIR}/.vnc/passwd"
-chmod 600 "${HOME_DIR}/.vnc/passwd"
+# Set up signal handlers
+trap cleanup SIGINT SIGTERM
 
-# Create a minimal xstartup if not present
-XSTARTUP_PATH="${HOME_DIR}/.vnc/xstartup"
-if [ ! -s "${XSTARTUP_PATH}" ]; then
-cat > "${XSTARTUP_PATH}" << 'EOF'
-#!/usr/bin/env sh
-unset SESSION_MANAGER
-unset DBUS_SESSION_BUS_ADDRESS
-XRDB_BIN="$(command -v xrdb || true)"
-if [ -n "$XRDB_BIN" ] && [ -f "$HOME/.Xresources" ]; then
-  "$XRDB_BIN" "$HOME/.Xresources"
-fi
-# Start Openbox, run the startup command, and keep Openbox in the foreground
-dbus-launch --exit-with-session openbox-session &
-echo "DISPLAY=${DISPLAY}"
+# Start Xvfb
+Xvfb :1 -ac -screen 0 1280x800x24 -dpi 96 -nolisten tcp &
+pids+=($!)
+
+# Run x11vnc with limited ulimit, due to a bug (slow when client connects) 
+(ulimit -n 1024; x11vnc -display :1) &
+pids+=($!)
+
+# Start openbox
+XDG_SESSION_TYPE=x11 mutter --replace --sm-disable &
+pids+=($!)
+
 sleep 2
-python3 server.py &
+
+uvicorn server:app --host 0.0.0.0 &
+pids+=($!)
+
+# Wait for all processes to finish
 wait
-EOF
-chmod +x "${XSTARTUP_PATH}"
-fi
-
-# Clean up any stale locks from previous crashes and ensure X11 socket dir exists
-rm -f /tmp/.X*-lock || true
-mkdir -p /tmp/.X11-unix
-chmod 1777 /tmp/.X11-unix
-rm -f /tmp/.X11-unix/X* || true
-
-# Ensure ownership (in case the script was run as root previously)
-#chown -R "${USERNAME}:${USERNAME}" "${HOME_DIR}/.vnc" || true
-
-# Kill existing server for this DISPLAY if running
-if vncserver -list 2>/dev/null | grep -q "${DISPLAY}"; then
-  vncserver -kill "${DISPLAY}" || true
-fi
-
-# Launch VNC server in the foreground so the container stays alive
-exec vncserver "${DISPLAY}" \
-  -localhost no \
-  -geometry "${DISPLAY_GEOMETRY}" \
-  -depth "${DISPLAY_DEPTH}" \
-  -fg
-
-
