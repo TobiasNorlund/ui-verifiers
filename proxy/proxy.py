@@ -18,13 +18,13 @@ http_client = httpx.AsyncClient(
     )
 )
 
-@app.api_route('/proxy/{episode_id}/{endpoint:path}', methods=['GET', 'POST', 'PUT', 'DELETE'])
-async def proxy_request(episode_id: str, endpoint: str, request: Request):
+@app.api_route('/proxy/{session_id}/{endpoint:path}', methods=['GET', 'POST', 'PUT', 'DELETE'])
+async def proxy_request(session_id: str, endpoint: str, request: Request):
     try:
         # Find the pod using a label selector
         pod_list = k8s_api.list_namespaced_pod(
             namespace='default',
-            label_selector=f'episode-id={episode_id}'
+            label_selector=f'session-id={session_id}'
         )
 
         if not pod_list.items:

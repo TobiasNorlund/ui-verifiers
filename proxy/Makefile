@@ -31,3 +31,8 @@ push:
 .PHONY: deploy
 deploy:
 	kubectl apply -f deploy-proxy.yaml
+
+
+.PHONY: delete
+delete:
+	kubectl delete -f deploy-proxy.yaml
