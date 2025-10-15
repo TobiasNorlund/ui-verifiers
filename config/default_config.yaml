@@ -1,0 +1,77 @@
+# Default training configuration
+
+training:
+  num_iterations: 1000
+  batch_size: 32
+  checkpoint_interval: 10
+  log_interval: 1
+
+  # Algorithm selection: 'rejection_sampling' or 'ppo'
+  algorithm: rejection_sampling
+
+model:
+  # HuggingFace model identifier
+  name: "Qwen/Qwen2-VL-2B-Instruct"  # Options: Qwen2-VL, llava-hf/llava-1.5-7b-hf, HuggingFaceM4/idefics2-8b
+
+  # Model loading options
+  torch_dtype: "float16"  # float16, bfloat16, float32
+  device: "cuda"  # cuda, cpu, auto
+
+  # LoRA configuration
+  use_lora: true
+  lora_config:
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+    lora_dropout: 0.05
+    bias: "none"
+
+  # Generation parameters
+  max_new_tokens: 128
+  temperature: 0.7
+  do_sample: true
+
+  # Training options
+  freeze_vision_encoder: false  # Set to true to only train language model
+
+  # Action format for parsing
+  action_format: "text"  # Options: "json", "text", "coordinates"
+
+actor:
+  num_actors: 4
+  max_steps_per_episode: 50
+  tasks_per_iteration: 128
+
+  # UI task configuration
+  session_type: "simple_data_entry"  # Type of UI task session
+  task_prompt: "Complete the data entry form with information from the spreadsheet"
+  action_delay: 1.0  # Delay in seconds after each action
+  screenshot_size: [224, 224]  # Image size for VLM input
+
+environment:
+  # ui-verifiers API URLs (GCP VM hostnames or IPs)
+  # Examples:
+  #   - http://ui-verifier-vm-1:8000
+  #   - http://34.123.45.67:8000
+  #   - http://ui-env-1.us-central1-a.c.project-id.internal:8000
+  ui_env_urls:
+    - "http://ui-verifier-vm-1:8000"
+    - "http://ui-verifier-vm-2:8000"
+    - "http://ui-verifier-vm-3:8000"
+    - "http://ui-verifier-vm-4:8000"
+
+  timeout: 30
+  max_retries: 3
+
+distributed:
+  use_distributed: false
+  num_vms: 4
+  gcp_project: ""
+  gcp_zone: us-central1-a
+  machine_type: n1-standard-4
+
+logging:
+  log_level: INFO
+  log_dir: experiments/default/logs
+  checkpoint_dir: experiments/default/checkpoints
+  trajectory_dir: experiments/default/trajectories
