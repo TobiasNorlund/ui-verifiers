@@ -5,7 +5,7 @@ import logging
 import torch
 import torch.nn as nn
 from transformers import (
-    AutoModelForVision2Seq,
+    AutoModelForImageTextToText,
     AutoProcessor,
     AutoTokenizer,
     PreTrainedModel,
@@ -27,7 +27,7 @@ class VLMWrapper(nn.Module):
     - Idefics2
     - Florence-2
     - PaliGemma
-    - Any HuggingFace VLM that follows Vision2Seq architecture
+    - Any HuggingFace VLM that follows ImageTextToText architecture
 
     Design:
     - Inherits from nn.Module for PyTorch compatibility
@@ -93,9 +93,9 @@ class VLMWrapper(nn.Module):
             )
 
         # Load model
-        self.model = AutoModelForVision2Seq.from_pretrained(
+        self.model = AutoModelForImageTextToText.from_pretrained(
             model_name,
-            torch_dtype=torch_dtype,
+            dtype=torch_dtype,
             device_map=device,
             trust_remote_code=True
         )
@@ -363,9 +363,9 @@ class VLMWrapper(nn.Module):
     def load_pretrained(self, load_path: str):
         """Load model and processor from path."""
         logger.info(f"Loading model from {load_path}")
-        self.model = AutoModelForVision2Seq.from_pretrained(
+        self.model = AutoModelForImageTextToText.from_pretrained(
             load_path,
-            torch_dtype=self.torch_dtype,
+            dtype=self.torch_dtype,
             device_map=self.device,
             trust_remote_code=True
         )
