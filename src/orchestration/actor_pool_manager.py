@@ -44,7 +44,7 @@ class ActorPoolManager:
         trajectory_queue: queue.Queue,
         task_prompt: str,
         session_type: str = "simple_data_entry",
-        max_steps_per_episode: int = 50,
+        max_steps_per_episode: int = 20,
         action_format: str = "json",
         monitor_interval: float = 2.0
     ):
