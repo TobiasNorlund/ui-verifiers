@@ -1,18 +1,6 @@
 # UI-RL: Reinforcement Learning for Vision-Language Model UI Agents
 
-A scalable framework for training Vision-Language Models (VLMs) to interact with user interfaces using Reinforcement Learning.
-
-## Overview
-
-This project implements an **Actor-Learner** RL training system for teaching VLMs to perform UI tasks. The system features:
-
-- **Actor-Learner Architecture**: Separate data collection (actors) and training (learner) for efficient scaling
-- **Config-Based Training**: YAML configuration system for easy experimentation
-- **Qwen2.5-VL Integration**: Default model with LoRA fine-tuning support
-- **ActorPoolManager**: Automatic actor lifecycle management with VM resource limits
-- **PIL-Based Pipeline**: Efficient image handling throughout the system
-- **HuggingFace Models**: Support for any `AutoModelForImageTextToText` VLM (Qwen2-VL, LLaVA, Idefics2, etc.)
-- **LoRA Fine-Tuning**: Parameter-efficient training with flexible layer targeting
+This project implements an **Actor-Learner** RL training system for teaching VLMs to perform UI tasks.
 
 ### Current Implementation Status
 
@@ -25,7 +13,20 @@ This project implements an **Actor-Learner** RL training system for teaching VLM
 - Configuration system with YAML files
 - PIL-based image pipeline
 
-🚧 **In Progress / TODO:** (see [TODO](#todo) section)
+## TODO
+### High Priority
+- [ ] Implement `/progress` endpoint protocol to get reward and done signals from UI-verifiers (Currently using dummy values (`reward=1.0`, `done=True`) in TaskRunner
+- [ ] Current ActionsDecoder is generic and needs updating to match Qwen2.5-VL output format
+- [ ] W&B integration for metrics
+- [ ] Implement evaluation script and metrics
+
+### Medium Priority
+- [ ] **PPO Algorithm**: Implement Proximal Policy Optimization (see `src/learner/algorithms/base.py` for interface)
+
+### Future Improvements
+- [ ] Trajectory replay buffer for off-policy learning
+- [ ] Multi-task training support
+
 
 ## Architecture
 
@@ -80,13 +81,13 @@ This project implements an **Actor-Learner** RL training system for teaching VLM
 - Puts finished trajectories in queue for training
 - **Lifecycle**: Runs ONE episode, then exits (clean session management)
 
-#### **Trainer** (src/learner/trainer.py)
+#### **Learner: Trainer** (src/learner/trainer.py)
 - Owns the trajectory queue
 - Waits for `batch_size` trajectories from actors
 - Processes trajectories with algorithm (e.g., filter by reward)
 - Computes loss and runs training step
 - Handles checkpointing and metrics logging
-- **Auto-detects learning rate**: 2e-4 for LoRA, 1e-5 for full fine-tuning
+- **Auto-detects learning rate**: 2e-4 for LoRA, 1e-5 for full fine-tuning based on https://thinkingmachines.ai/blog/lora/. 
 
 #### **VLMWrapper** (src/models/vlm_wrapper.py)
 - Loads HuggingFace VLMs (`AutoModelForImageTextToText`)
@@ -97,7 +98,7 @@ This project implements an **Actor-Learner** RL training system for teaching VLM
   - `"all-linear"`: all linear layers
   - `"custom"`: user-specified modules
 - Handles inference (`predict_action`) and training (`forward`)
-- Accepts PIL Images directly (no unnecessary conversions)
+- Accepts PIL Images directly (no unnecessary conversions) as that is expected input to HF processor().
 
 #### **ActorPoolManager** (src/orchestration/actor_pool_manager.py)
 - Maintains pool of concurrent actors (TaskRunners)
@@ -105,21 +106,14 @@ This project implements an **Actor-Learner** RL training system for teaching VLM
 - Automatically spawns replacement actors when episodes finish
 - Round-robin load balancing across multiple VMs
 - Monitor thread for health checks and crash recovery
-- **Design**: One actor = one episode = one VM session
+- One actor = one episode = one VM session
 
 #### **Config System** (src/config/)
 - YAML-based configuration for all components
 - Dataclass-based validation
 - Easy experimentation with different hyperparameters
-- See `config/README.md` for details
 
 ## Installation
-
-### Prerequisites
-
-- Python 3.9+
-- CUDA-capable GPU (recommended)
-- PyTorch 2.0+
 
 ### Setup with UV (Recommended)
 
@@ -182,8 +176,6 @@ environment:
     - "http://your-vm-ip:8000"
 ```
 
-See `config/README.md` for full configuration reference.
-
 ### 2. Run Training
 
 ```bash
@@ -201,13 +193,6 @@ python scripts/train_with_config.py \
     --num-steps 500
 ```
 
-### 3. Test VM Connection
-
-Before full training, test connection to ui-verifiers VM:
-
-```bash
-python scripts/test_vm_connection.py --vm-url http://your-vm-ip:8000
-```
 
 ## Project Structure
 
@@ -325,90 +310,6 @@ trajectory = runner.run_episode()
 print(f"Steps: {len(trajectory)}, Reward: {trajectory.total_reward()}")
 ```
 
-## Algorithms
-
-### Rejection Sampling (Implemented)
-
-Trains only on trajectories that meet a reward threshold:
-
-```python
-from src.learner.algorithms.rejection_sampling import RejectionSampling
-
-algorithm = RejectionSampling(reward_threshold=0.0)
-```
-
-**How it works:**
-1. Collect trajectories from actors
-2. Filter by reward: keep only if `total_reward > threshold`
-3. Train on successful trajectories using supervised learning
-
-## Configuration
-
-The config system allows easy experimentation. Key features:
-
-- **Model config**: Model selection, LoRA settings, generation parameters
-- **Trainer config**: Batch size, learning rate, algorithm selection
-- **Actor config**: Episode length, task prompts, action format
-- **Actor pool config**: Concurrent actors, VM limits
-- **Environment config**: VM URLs, timeouts
-
-### Example Configs
-
-```bash
-# Baseline LoRA training
-config/qwen25_vl_lora.yaml
-
-# Full fine-tuning (no LoRA)
-config/qwen25_vl_full_finetune.yaml
-
-# Multi-VM distributed
-config/multi_vm_distributed.yaml
-
-# Ablation studies
-config/experiments/lora_ablation_attention_only.yaml
-config/experiments/lora_ablation_mlp_only.yaml
-```
-
-See `config/README.md` for complete documentation.
-
-## Documentation
-
-- [Configuration Guide](config/README.md) - Complete config reference
-- [UV Package Manager](UV_USAGE.md) - Using UV for dependency management
-- [HuggingFace Setup](HUGGINGFACE_SETUP.md) - Model integration details
-- [Architecture Decisions](ARCHITECTURE_DECISIONS.md) - Design rationale
-- [Integration Summary](INTEGRATION_SUMMARY.md) - System integration overview
-
-## TODO
-
-### High Priority
-- [ ] **Evaluation Process**: Implement evaluation script and metrics
-  - Need to define evaluation tasks
-  - Create eval.py script
-  - Metrics: success rate, average steps, action accuracy
-
-- [ ] **UI-Verifiers API Returns**: Define reward and done signals
-  - Currently using dummy values (`reward=1.0`, `done=True`)
-  - Need to implement `/progress` endpoint protocol
-  - Define task-specific reward functions
-
-- [ ] **Actions Decoder**: Update for model-specific outputs
-  - Current decoder is generic
-  - Need to match Qwen2.5-VL output format
-  - May need model-specific parsing logic
-
-### Medium Priority
-- [ ] **PPO Algorithm**: Implement Proximal Policy Optimization
-  - More sophisticated than rejection sampling
-  - Requires advantage estimation and value function
-  - See `src/learner/algorithms/base.py` for interface
-
-### Future Enhancements
-- [ ] Trajectory replay buffer for off-policy learning
-- [ ] Multi-task training support
-- [ ] Distributed training across multiple machines
-- [ ] W&B / TensorBoard integration for metrics
-- [ ] Model checkpointing strategies (best, periodic, etc.)
 
 ## Development
 

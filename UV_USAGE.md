@@ -30,18 +30,6 @@ uv run python scripts/test_vm_connection.py --vm-url http://VM_IP:8000 --num-run
 uv run python scripts/train.py --config config/default_config.yaml
 ```
 
-### Running Tests
-
-```bash
-# Install dev dependencies
-uv sync --extra dev
-
-# Run tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=src --cov-report=html
-```
 
 ### Development Workflow
 
@@ -88,13 +76,6 @@ deactivate
 - `src/` - Source code
 - `scripts/` - Executable scripts
 - `tests/` - Test files
-
-## Why UV?
-
-- **Fast**: 10-100x faster than pip
-- **Reliable**: Deterministic dependency resolution with lockfile
-- **Modern**: Uses pyproject.toml standard
-- **Simple**: One tool for all package management tasks
 
 ## Optional Dependencies
 

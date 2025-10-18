@@ -475,18 +475,3 @@ gcloud compute firewall-rules delete allow-internal-ui-rl --quiet
 
 echo "Cleanup complete!"
 ```
-
-## Next Steps
-
-- Set up Cloud Storage for checkpoints
-- Configure Cloud Logging and Monitoring
-- Implement auto-scaling for ui-verifier VMs
-- Use managed instance groups for high availability
-- Set up CI/CD pipeline for model deployment
-
-## Additional Resources
-
-- [GCP Compute Engine Documentation](https://cloud.google.com/compute/docs)
-- [GCP Firewall Rules Guide](https://cloud.google.com/vpc/docs/firewalls)
-- [GCP GPU Documentation](https://cloud.google.com/compute/docs/gpus)
-- [ui-verifiers Repository](https://github.com/yourusername/ui-verifiers)

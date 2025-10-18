@@ -44,18 +44,6 @@ class ActionsDecoder:
         'triple_click',
     }
 
-    # Action aliases for more flexible parsing
-    ACTION_ALIASES = {
-        'click': 'left_click',
-        'left': 'left_click',
-        'right': 'right_click',
-        'double': 'double_click',
-        'triple': 'triple_click',
-        'move': 'mouse_move',
-        'moveto': 'mouse_move',
-        'screenshot': 'screenshot',
-        'screen': 'screenshot',
-    }
 
     def __init__(self, default_format: str = "json"):
         """
@@ -286,10 +274,6 @@ class ActionsDecoder:
         # Check if already valid
         if action in self.VALID_ACTIONS:
             return action
-
-        # Check aliases
-        if action in self.ACTION_ALIASES:
-            return self.ACTION_ALIASES[action]
 
         return None
 
