@@ -41,7 +41,7 @@ class Trainer:
         trajectory_queue: queue.Queue,
         optimizer: Optional[torch.optim.Optimizer] = None,
         batch_size: int = 32,
-        learning_rate: float = 1e-5,
+        learning_rate: Optional[float] = None,
         checkpoint_dir: Optional[Path] = None,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         queue_timeout: float = 5.0
@@ -53,7 +53,7 @@ class Trainer:
             trajectory_queue: Queue that actors put trajectories into
             optimizer: Optional optimizer (creates AdamW if None)
             batch_size: Number of trajectories per training batch
-            learning_rate: Learning rate
+            learning_rate: Learning rate (auto-detected if None: 2e-4 for LoRA, 1e-5 for full)
             checkpoint_dir: Directory to save checkpoints
             device: Device for training
             queue_timeout: Timeout in seconds when waiting for trajectories
@@ -65,9 +65,24 @@ class Trainer:
         self.device = device
         self.queue_timeout = queue_timeout
 
+        # Auto-detect learning rate based on whether LoRA is used
+        if learning_rate is None:
+            if hasattr(model, 'peft_config'):
+                # LoRA detected: use higher learning rate (research recommendation)
+                learning_rate = 2e-4
+                logger.info("Detected LoRA model, using learning_rate=2e-4")
+            else:
+                # Full fine-tuning: use lower learning rate
+                learning_rate = 1e-5
+                logger.info("Full fine-tuning model, using learning_rate=1e-5")
+        else:
+            logger.info(f"Using provided learning_rate={learning_rate}")
+
+        self.learning_rate = learning_rate
+
         # Create optimizer if not provided
         if optimizer is None:
-            self.optimizer = AdamW(model.parameters(), lr=learning_rate)
+            self.optimizer = AdamW(model.parameters(), lr=self.learning_rate)
         else:
             self.optimizer = optimizer
 
@@ -140,7 +155,12 @@ class Trainer:
         return metrics
 
     def _batch_to_device(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        """Move batch tensors to training device."""
+        """
+        Move batch tensors to training device.
+
+        Note: Images are kept as PIL Images (List[Image.Image]) since VLMWrapper
+        expects PIL Images as input. Only numpy arrays and tensors are moved to device.
+        """
         device_batch = {}
         for key, value in batch.items():
             if isinstance(value, np.ndarray):
@@ -148,6 +168,7 @@ class Trainer:
             elif isinstance(value, torch.Tensor):
                 device_batch[key] = value.to(self.device)
             else:
+                # Keep as-is (e.g., PIL Images, lists, dicts)
                 device_batch[key] = value
         return device_batch
 

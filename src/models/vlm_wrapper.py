@@ -38,11 +38,12 @@ class VLMWrapper(nn.Module):
 
     def __init__(
         self,
-        model_name: str,
+        model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct",
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         torch_dtype: torch.dtype = torch.float16,
         use_lora: bool = False,
         lora_config: Optional[Dict[str, Any]] = None,
+        lora_target_option: str = "attention+mlp",
         max_new_tokens: int = 128,
         temperature: float = 0.7,
         do_sample: bool = True,
@@ -51,11 +52,17 @@ class VLMWrapper(nn.Module):
         Initialize VLM wrapper with HuggingFace model.
 
         Args:
-            model_name: HuggingFace model identifier (e.g., "Qwen/Qwen2-VL-2B-Instruct")
+            model_name: HuggingFace model identifier (default: "Qwen/Qwen2.5-VL-3B-Instruct")
             device: Device to load model on
             torch_dtype: Data type for model weights (float16 for efficiency)
             use_lora: Whether to use LoRA for efficient fine-tuning
             lora_config: LoRA configuration dict (rank, alpha, dropout, etc.)
+            lora_target_option: Which layers to target with LoRA:
+                - "attention": Only attention layers (q, k, v, o projections)
+                - "mlp": Only MLP/FFN layers (gate, up, down projections)
+                - "attention+mlp": Both attention and MLP (recommended)
+                - "all-linear": All linear layers automatically
+                - "custom": Use custom_modules from lora_config
             max_new_tokens: Maximum tokens to generate
             temperature: Sampling temperature
             do_sample: Whether to use sampling (vs greedy decoding)
@@ -65,6 +72,7 @@ class VLMWrapper(nn.Module):
         self.model_name = model_name
         self.device = device
         self.torch_dtype = torch_dtype
+        self.lora_target_option = lora_target_option
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.do_sample = do_sample
@@ -102,26 +110,98 @@ class VLMWrapper(nn.Module):
         logger.info(f"Model parameters: {sum(p.numel() for p in self.model.parameters()) / 1e6:.2f}M")
         logger.info(f"Trainable parameters: {sum(p.numel() for p in self.model.parameters() if p.requires_grad) / 1e6:.2f}M")
 
+    def _get_lora_target_modules(
+        self,
+        option: str,
+        custom_modules: Optional[List[str]] = None
+    ) -> Union[str, List[str]]:
+        """
+        Get target modules for LoRA based on targeting strategy.
+
+        Args:
+            option: One of "attention", "mlp", "attention+mlp", "all-linear", "custom"
+            custom_modules: Custom module list (only used if option="custom")
+
+        Returns:
+            Target modules for LoRA config
+        """
+        if option == "attention":
+            # Only attention layers
+            return ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+        elif option == "mlp":
+            # Only MLP/FFN layers
+            return ["gate_proj", "up_proj", "down_proj"]
+
+        elif option == "attention+mlp":
+            # Both attention and MLP (recommended per research)
+            return [
+                # Attention
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                # MLP
+                "gate_proj", "up_proj", "down_proj"
+            ]
+
+        elif option == "all-linear":
+            # All linear layers (automatic detection by PEFT)
+            return "all-linear"
+
+        elif option == "custom":
+            # User-specified modules
+            if custom_modules is None:
+                raise ValueError("custom_modules must be provided when option='custom'")
+            return custom_modules
+
+        else:
+            raise ValueError(
+                f"Unknown lora_target_option: {option}. "
+                f"Must be one of: attention, mlp, attention+mlp, all-linear, custom"
+            )
+
+    def _print_trainable_parameters(self):
+        """Print trainable vs total parameters."""
+        trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        total = sum(p.numel() for p in self.model.parameters())
+        percentage = 100 * trainable / total
+
+        logger.info(f"Trainable params: {trainable:,} ({percentage:.2f}%)")
+        logger.info(f"Total params: {total:,}")
+        logger.info(f"LoRA params: {trainable / 1e6:.2f}M / {total / 1e6:.2f}M")
+
     def _apply_lora(self, lora_config: Optional[Dict[str, Any]] = None):
         """Apply LoRA for parameter-efficient fine-tuning."""
         try:
             from peft import LoraConfig, get_peft_model
 
             if lora_config is None:
-                lora_config = {
-                    "r": 16,
-                    "lora_alpha": 32,
-                    "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj"],
-                    "lora_dropout": 0.05,
-                    "bias": "none",
-                    "task_type": "CAUSAL_LM"
-                }
+                lora_config = {}
 
-            config = LoraConfig(**lora_config)
+            # Set defaults with option to override
+            default_config = {
+                "r": 32,  # Increased from 16 based on research
+                "lora_alpha": 32,
+                "target_modules": self._get_lora_target_modules(
+                    self.lora_target_option,
+                    lora_config.get("custom_modules")
+                ),
+                "lora_dropout": 0.05,
+                "bias": "none",
+                "task_type": "CAUSAL_LM"
+            }
+
+            # Merge user config with defaults (user config takes precedence)
+            default_config.update(lora_config)
+
+            logger.info(f"LoRA target option: {self.lora_target_option}")
+            logger.info(f"LoRA target modules: {default_config['target_modules']}")
+            logger.info(f"LoRA rank (r): {default_config['r']}")
+            logger.info(f"LoRA alpha: {default_config['lora_alpha']}")
+
+            config = LoraConfig(**default_config)
             self.model = get_peft_model(self.model, config)
 
             logger.info("LoRA applied successfully")
-            logger.info(f"LoRA config: {lora_config}")
+            self._print_trainable_parameters()
 
         except ImportError:
             logger.error("peft library not installed. Install with: pip install peft")
@@ -150,6 +230,7 @@ class VLMWrapper(nn.Module):
             - hidden_states: Optional hidden states
         """
         # Preprocess inputs
+        # ? Replace with asserts to verify that we are getting PIL Images?
         if isinstance(images, torch.Tensor):
             # Convert tensor to list of PIL images for processor
             images = self._tensor_to_pil_images(images)
@@ -240,36 +321,6 @@ class VLMWrapper(nn.Module):
                 generated_text = generated_text.replace(prompt, "").strip()
 
             return generated_text
-
-    def generate_action_logits(
-        self,
-        images: Union[torch.Tensor, List[Image.Image], np.ndarray],
-        prompts: Union[str, List[str]],
-        action_vocab: Optional[List[str]] = None
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Generate action logits for training (with teacher forcing).
-
-        Args:
-            images: Input images
-            prompts: Text prompts
-            action_vocab: Optional vocabulary of valid actions
-
-        Returns:
-            Dictionary with action_logits and other outputs
-        """
-        outputs = self.forward(images, prompts, return_loss=False)
-
-        # Extract action-relevant logits
-        # This depends on your action representation
-        # Placeholder implementation
-        action_logits = outputs["logits"][:, -1, :]  # Last token logits
-
-        return {
-            "action_logits": action_logits,
-            "logits": outputs["logits"],
-            "hidden_states": outputs["hidden_states"]
-        }
 
     def _tensor_to_pil_images(self, tensor: torch.Tensor) -> List[Image.Image]:
         """Convert batch of tensors to list of PIL images."""

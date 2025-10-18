@@ -96,37 +96,38 @@ class TaskRunner:
 
         logger.info(f"TaskRunner initialized with env: {ui_env_url}")
 
-    def _preprocess_screenshot(self, screenshot: Image.Image) -> np.ndarray:
+    def _preprocess_screenshot(self, screenshot: Image.Image) -> Image.Image:
         """
         Preprocess screenshot for VLM input.
+
+        Note: Returns PIL Image directly to avoid unnecessary conversions.
+        VLMWrapper expects PIL Images as input.
 
         Args:
             screenshot: PIL Image screenshot
 
         Returns:
-            Preprocessed screenshot as numpy array [H', W', C]
+            Preprocessed screenshot as PIL Image (currently no-op, can add resize/crop later)
         """
-        # Resize to standard size
-        #img = screenshot.resize(self.screenshot_size, Image.Resampling.BILINEAR)
-        img = screenshot
-        #img.save("debug_screenshot_2.png")
-        #logger.info("Screenshot saved to debug_screenshot.png")    
-        return np.array(img)
+        # Optional: Resize to standard size if needed
+        # img = screenshot.resize(self.screenshot_size, Image.Resampling.BILINEAR)
 
-    def _get_action(self, screenshot: np.ndarray, prompt: str) -> Dict[str, Any]:
+        # Return PIL Image directly (no numpy conversion)
+        return screenshot
+
+    def _get_action(self, screenshot: Image.Image, prompt: str) -> Dict[str, Any]:
         """
         Run VLM inference to get action.
 
         Args:
-            screenshot: Preprocessed screenshot
+            screenshot: PIL Image screenshot
             prompt: Task prompt
 
         Returns:
             Action dict, e.g. {"action_type": "left_click", "x": 100, "y": 200}
         """
         with torch.no_grad():  # No gradients during inference
-            # VLMWrapper handles the conversion and inference
-            # predict_action accepts numpy array, PIL Image, or tensor
+            # VLMWrapper.predict_action accepts PIL Image directly
             generated_text = self.model.predict_action(
                 images=screenshot,
                 prompt=prompt
@@ -323,15 +324,15 @@ class TaskRunner:
         Run a single episode and return the complete trajectory.
 
         Returns:
-            Completed trajectory
+            Completed trajectory with PIL Images in observations
         """
         # Create new session
         self.current_session_id = self._create_session()
 
-        # Get initial screenshot
+        # Get initial screenshot (PIL Image)
         screenshot = self._get_screenshot(self.current_session_id)
-        screenshot_np = self._preprocess_screenshot(screenshot)
-        
+        screenshot = self._preprocess_screenshot(screenshot)
+
         # Initialize trajectory
         observations = []
         actions = []
@@ -348,20 +349,20 @@ class TaskRunner:
 
         try:
             while not done and step < self.max_steps_per_episode:
-                # Get action from model
-                action = self._get_action(screenshot_np, self.task_prompt)
+                # Get action from model (PIL Image input)
+                action = self._get_action(screenshot, self.task_prompt)
                 # Execute action in environment
                 next_screenshot, reward, done, info = self._execute_action(action)
-                next_screenshot_np = self._preprocess_screenshot(next_screenshot)
+                next_screenshot = self._preprocess_screenshot(next_screenshot)
 
-                # Store transition
-                observations.append(screenshot_np)
+                # Store transition (PIL Images directly)
+                observations.append(screenshot)
                 actions.append(action)
                 rewards.append(reward)
                 prompts.append(self.task_prompt)
 
                 # Update state
-                screenshot_np = next_screenshot_np
+                screenshot = next_screenshot
                 step += 1
 
                 logger.debug(f"Step {step}: action={action['action_type']}, reward={reward:.3f}, done={done}")

@@ -12,14 +12,18 @@ def collate_trajectories(trajectories: List[Trajectory]) -> Dict[str, Any]:
     Design: Standalone function (not part of Trajectory class) for flexibility.
     Can be easily customized without modifying Trajectory.
 
+    Note: Images are kept as PIL Images (not converted to numpy/tensors) to maintain
+    compatibility with VLMWrapper which expects PIL Images as input. This avoids
+    unnecessary conversions: PIL → numpy → tensor → PIL.
+
     Args:
         trajectories: List of trajectories to batch together
 
     Returns:
         Dict containing batched data ready for model training:
-        - images: [B*T, H, W, C] stacked observations
+        - images: List[PIL.Image] of all observations (kept as PIL for VLMWrapper)
         - actions: [B*T] flattened actions
-        - rewards: [B*T] flattened rewards
+        - rewards: [B*T] flattened rewards (numpy array)
         - prompts: [B*T] flattened prompts
         - trajectory_lengths: [B] length of each trajectory (for masking if needed)
         - trajectory_indices: [B*T] which trajectory each timestep belongs to
@@ -35,6 +39,7 @@ def collate_trajectories(trajectories: List[Trajectory]) -> Dict[str, Any]:
     trajectory_indices = []
 
     for traj_idx, traj in enumerate(trajectories):
+        # Extend with PIL Images directly (no conversion)
         all_observations.extend(traj.observations)
         all_actions.extend(traj.actions)
         all_rewards.extend(traj.rewards)
@@ -43,7 +48,7 @@ def collate_trajectories(trajectories: List[Trajectory]) -> Dict[str, Any]:
         trajectory_indices.extend([traj_idx] * len(traj))
 
     return {
-        'images': np.stack(all_observations) if all_observations else np.array([]),
+        'images': all_observations,  # List of PIL Images
         'actions': all_actions,
         'rewards': np.array(all_rewards),
         'prompts': all_prompts,
