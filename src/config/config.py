@@ -57,6 +57,8 @@ class ActorConfig:
     screenshot_size: List[int] = field(default_factory=lambda: [224, 224])
     task_prompt: str = "Complete the data entry task"
     session_type: str = "simple_data_entry"
+    data_dir: Optional[str] = None  # Optional directory to save raw trajectories
+    action_delay: float = 1.0  # Delay in seconds after each action
 
 
 @dataclass

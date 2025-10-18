@@ -37,6 +37,8 @@ actor:
   screenshot_size: [224, 224]
   task_prompt: "Complete the data entry task"
   session_type: "simple_data_entry"
+  action_delay: 1.0
+  data_dir: null
 
 actor_pool:
   target_concurrent_actors: 2

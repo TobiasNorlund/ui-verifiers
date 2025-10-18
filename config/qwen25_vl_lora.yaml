@@ -8,12 +8,12 @@ experiment_name: "qwen25_vl_lora_baseline"
 model:
   name: "Qwen/Qwen2.5-VL-3B-Instruct"
   device: "cuda"  # "cuda", "cpu", "mps"
-  torch_dtype: "float16"  # "float16", "bfloat16", "float32"
+  torch_dtype: "bfloat16"  # "float16", "bfloat16", "float32"
 
   # LoRA configuration (recommended settings)
   use_lora: true
   lora_target_option: "attention+mlp"  # Target both attention and MLP layers
-  lora_rank: 32  # Increased from 16 based on research
+  lora_rank: 32  # Increased from 16 based on https://thinkingmachines.ai/blog/lora/
   lora_alpha: 32
   lora_dropout: 0.05
   lora_bias: "none"
@@ -28,7 +28,7 @@ model:
   freeze_vision_encoder: false  # Set to true to only train language model
 
 trainer:
-  batch_size: 4  # Number of trajectories per training batch
+  batch_size: 32  # Number of trajectories per training batch
   learning_rate: null  # Auto-detect: 2e-4 for LoRA, 1e-5 for full fine-tuning
   num_training_steps: 100
   save_every: 10  # Save checkpoint every N steps
@@ -44,6 +44,8 @@ actor:
   screenshot_size: [224, 224]  # Not currently used (VLM handles resizing)
   task_prompt: "Complete the data entry task"
   session_type: "simple_data_entry"
+  action_delay: 1.0  # Delay in seconds after each action
+  data_dir: null  # Optional: directory to save raw trajectories
 
 actor_pool:
   target_concurrent_actors: 2  # Number of actors to run concurrently

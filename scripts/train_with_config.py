@@ -166,6 +166,8 @@ def create_actor_pool_from_config(
         session_type=config.actor.session_type,
         max_steps_per_episode=config.actor.max_steps_per_episode,
         action_format=config.actor.action_format,
+        action_delay=config.actor.action_delay,
+        data_dir=config.actor.data_dir,
         monitor_interval=config.actor_pool.monitor_interval
     )
 

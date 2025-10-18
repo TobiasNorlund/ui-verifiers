@@ -46,6 +46,8 @@ class ActorPoolManager:
         session_type: str = "simple_data_entry",
         max_steps_per_episode: int = 20,
         action_format: str = "json",
+        action_delay: float = 1.0,
+        data_dir: Optional[Path] = None,
         monitor_interval: float = 2.0
     ):
         """
@@ -61,6 +63,8 @@ class ActorPoolManager:
             session_type: Type of VM session to create
             max_steps_per_episode: Max steps per episode
             action_format: Action format for action decoder
+            action_delay: Delay in seconds after each action
+            data_dir: Optional directory to save raw trajectories
             monitor_interval: How often to check actor health (seconds)
         """
         self.target_concurrent_actors = target_concurrent_actors
@@ -72,6 +76,8 @@ class ActorPoolManager:
         self.session_type = session_type
         self.max_steps_per_episode = max_steps_per_episode
         self.action_format = action_format
+        self.action_delay = action_delay
+        self.data_dir = Path(data_dir) if data_dir else None
         self.monitor_interval = monitor_interval
 
         # State tracking (protected by lock)
@@ -254,8 +260,9 @@ class ActorPoolManager:
                 task_prompt=self.task_prompt,
                 session_type=self.session_type,
                 max_steps_per_episode=self.max_steps_per_episode,
-                action_delay=1.0,
-                action_format=self.action_format
+                action_delay=self.action_delay,
+                action_format=self.action_format,
+                data_dir=self.data_dir
             )
 
             # Run EXACTLY ONE episode
