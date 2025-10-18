@@ -3,6 +3,7 @@
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
+import queue
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,13 +21,13 @@ class Trainer:
     Learner component: Trains the VLM using trajectories from actors.
 
     Design decisions:
-    1. Uses composition (Algorithm class) for flexibility
-    2. Waits for batch_size trajectories before training
+    1. Owns the trajectory queue - waits for batch_size trajectories
+    2. Uses composition (Algorithm class) for flexibility
     3. Delegates algorithm-specific logic to Algorithm class
     4. Handles model checkpointing and logging
 
     Responsibilities:
-    - Collect trajectories from queue until batch is ready
+    - Wait for batch_size trajectories from queue
     - Process trajectories with algorithm
     - Run training step
     - Save checkpoints
@@ -37,26 +38,32 @@ class Trainer:
         self,
         model: nn.Module,
         algorithm: Algorithm,
+        trajectory_queue: queue.Queue,
         optimizer: Optional[torch.optim.Optimizer] = None,
         batch_size: int = 32,
         learning_rate: float = 1e-5,
         checkpoint_dir: Optional[Path] = None,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu"
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        queue_timeout: float = 5.0
     ):
         """
         Args:
             model: VLM to train
             algorithm: Algorithm to use (RejectionSampling, PPO, etc.)
+            trajectory_queue: Queue that actors put trajectories into
             optimizer: Optional optimizer (creates AdamW if None)
             batch_size: Number of trajectories per training batch
             learning_rate: Learning rate
             checkpoint_dir: Directory to save checkpoints
             device: Device for training
+            queue_timeout: Timeout in seconds when waiting for trajectories
         """
         self.model = model.to(device)
         self.algorithm = algorithm
+        self.trajectory_queue = trajectory_queue
         self.batch_size = batch_size
         self.device = device
+        self.queue_timeout = queue_timeout
 
         # Create optimizer if not provided
         if optimizer is None:
@@ -74,6 +81,7 @@ class Trainer:
         self.trajectories_seen = 0
 
         logger.info(f"Trainer initialized with {algorithm.__class__.__name__}")
+        logger.info(f"Batch size: {batch_size}, Queue timeout: {queue_timeout}s")
 
     def train_step(self, trajectories: List[Trajectory]) -> Dict[str, float]:
         """
@@ -184,20 +192,90 @@ class Trainer:
         except Exception as e:
             logger.error(f"Failed to load checkpoint: {e}")
 
-    def run_training_loop(self, num_iterations: int):
+    def _collect_batch(self) -> List[Trajectory]:
         """
-        Run the complete training loop.
+        Collect batch_size trajectories from the queue.
+
+        Waits until enough trajectories are available.
+
+        Returns:
+            List of trajectories (may be less than batch_size if queue closes)
+        """
+        trajectories = []
+
+        logger.info(f"Waiting for {self.batch_size} trajectories from queue...")
+
+        while len(trajectories) < self.batch_size:
+            try:
+                trajectory = self.trajectory_queue.get(timeout=self.queue_timeout)
+                trajectories.append(trajectory)
+                logger.debug(f"Collected trajectory {len(trajectories)}/{self.batch_size} "
+                           f"(reward: {trajectory.total_reward():.2f}, "
+                           f"steps: {len(trajectory.observations)})")
+            except queue.Empty:
+                # Queue is empty, continue waiting
+                if len(trajectories) > 0:
+                    logger.debug(f"Queue empty, waiting... ({len(trajectories)}/{self.batch_size} collected)")
+                continue
+
+        logger.info(f"Collected {len(trajectories)} trajectories for training")
+        return trajectories
+
+    def train(
+        self,
+        num_steps: Optional[int] = None,
+        save_every: Optional[int] = None
+    ) -> List[Dict[str, float]]:
+        """
+        Main training loop: waits for trajectories and trains.
+
+        This method blocks and continuously waits for trajectories from the queue,
+        runs training steps when enough trajectories are available.
 
         Args:
-            num_iterations: Number of training iterations
+            num_steps: Number of training steps to run (None = infinite)
+            save_every: Save checkpoint every N steps (None = don't save)
+
+        Returns:
+            List of metrics dictionaries from each training step
         """
-        for iteration in range(num_iterations):
-            logger.info(f"Training iteration {iteration + 1}/{num_iterations}")
+        logger.info("=" * 60)
+        logger.info("Starting training loop")
+        logger.info(f"Training steps: {num_steps or '∞'}")
+        logger.info(f"Batch size: {self.batch_size}")
+        logger.info("=" * 60)
 
-            # TODO: Implement full training loop with data collection
-            # 1. Collect trajectories using actors
-            # 2. Train on collected data
-            # 3. Log metrics
-            # 4. Save checkpoints
+        all_metrics = []
+        step = 0
 
-            self.global_step += 1
+        try:
+            while num_steps is None or step < num_steps:
+                logger.info(f"\n--- Training Step {step + 1}/{num_steps or '∞'} ---")
+
+                # Collect batch of trajectories from queue
+                trajectories = self._collect_batch()
+
+                if len(trajectories) == 0:
+                    logger.warning("No trajectories collected, stopping training")
+                    break
+
+                # Run training step
+                metrics = self.train_step(trajectories)
+                all_metrics.append(metrics)
+
+                # Save checkpoint if configured
+                if save_every and (step + 1) % save_every == 0:
+                    self.save_checkpoint()
+
+                step += 1
+
+        except KeyboardInterrupt:
+            logger.info("\nTraining interrupted by user")
+
+        logger.info("\n" + "=" * 60)
+        logger.info("Training Complete")
+        logger.info("=" * 60)
+        logger.info(f"Total steps: {self.step}")
+        logger.info(f"Total trajectories seen: {self.trajectories_seen}")
+
+        return all_metrics

@@ -107,7 +107,10 @@ class TaskRunner:
             Preprocessed screenshot as numpy array [H', W', C]
         """
         # Resize to standard size
-        img = screenshot.resize(self.screenshot_size, Image.Resampling.BILINEAR)
+        #img = screenshot.resize(self.screenshot_size, Image.Resampling.BILINEAR)
+        img = screenshot
+        #img.save("debug_screenshot_2.png")
+        #logger.info("Screenshot saved to debug_screenshot.png")    
         return np.array(img)
 
     def _get_action(self, screenshot: np.ndarray, prompt: str) -> Dict[str, Any]:
@@ -167,21 +170,26 @@ class TaskRunner:
             screenshot = Image.open(BytesIO(response.content))
 
             # Get progress/reward from separate endpoint
-            progress_response = requests.get(
-                f"{self.ui_env_url}/session/{self.current_session_id}/progress",
-                timeout=30
-            )
-            progress_response.raise_for_status()
-            progress_data = progress_response.json()
+            #progress_response = requests.get(
+            #    f"{self.ui_env_url}/session/{self.current_session_id}/progress",
+            #    timeout=30
+            #)
+            #logger.info(f"Progress: {progress_response}")
+            #progress_response.raise_for_status()
+            #progress_data = progress_response.json()
+            
 
             # Calculate reward based on progress
             # This is task-specific; for simple_data_entry it tracks correct submissions
-            reward = self._calculate_reward(progress_data)
+            #reward = self._calculate_reward(progress_data) # TODO: Protocol for progress not decided yet
+            reward = 1.0 # TODO: Protocol for progress not decided yet
 
             # Check if episode should end
-            done = self._check_done(progress_data)
+            #done = self._check_done(progress_data) # TODO: Protocol for done is not decided yet
+            done = True # TODO: Protocol for done is not decided yet
 
-            return screenshot, reward, done, progress_data
+            #return screenshot, reward, done, progress_data
+            return screenshot, reward, done, {}
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing action: {e}")
@@ -299,6 +307,10 @@ class TaskRunner:
             response.raise_for_status()
 
             screenshot = Image.open(BytesIO(response.content))
+            
+            #screenshot.save(f"debug_screenshot_{session_id}.png")
+            #logger.info(f"Screenshot saved to debug_screenshot_{session_id}.png")
+            
             return screenshot
 
         except requests.exceptions.RequestException as e:
@@ -319,7 +331,7 @@ class TaskRunner:
         # Get initial screenshot
         screenshot = self._get_screenshot(self.current_session_id)
         screenshot_np = self._preprocess_screenshot(screenshot)
-
+        
         # Initialize trajectory
         observations = []
         actions = []
@@ -338,7 +350,6 @@ class TaskRunner:
             while not done and step < self.max_steps_per_episode:
                 # Get action from model
                 action = self._get_action(screenshot_np, self.task_prompt)
-
                 # Execute action in environment
                 next_screenshot, reward, done, info = self._execute_action(action)
                 next_screenshot_np = self._preprocess_screenshot(next_screenshot)
@@ -358,6 +369,7 @@ class TaskRunner:
         finally:
             # Always close session, even if error occurred
             self._close_session(self.current_session_id)
+            #TODO: Handle logic if session ends with error
 
         # Create trajectory
         total_reward = sum(rewards)
@@ -414,7 +426,6 @@ class TaskRunner:
                 trajectory = self.run_episode()
                 self.trajectory_queue.put(trajectory)
                 episode += 1
-
                 logger.info(f"Completed episode {episode}/{num_episodes or '∞'}")
 
         except KeyboardInterrupt:
