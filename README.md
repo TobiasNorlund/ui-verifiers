@@ -9,36 +9,24 @@ Implements infrastructure and verifiable desktop tasks for scaling training of U
 
 ## UI Verifiers Server
 
-**Note:** This has to be run on a machine with `Xvfb` and `gnome-session` available.
 
 Launch the server locally with:
 
 ```bash
-uv run uvicorn ui_verifiers.server:app
+make build run
 ```
 
 **Usage:**
 ```bash
-# Show status of all sessions
-curl "http://localhost:8000/status"
-
-# Create two new "simple data entry" task sessions
-curl -X POST "http://localhost:8000/session?type=simple_data_entry&n=2"
+# Show status
+curl "http://localhost:8000"
 
 # Get screenshot from a session
-curl "http://localhost:8000/session/1/screenshot" > screen.png
+curl "http://localhost:8000/act?action_type=screenshot" > screen.png
 
 # Perform an action in a session (e.g. left click in top left corner), and get screenshot after 1s
-curl "http://localhost:8000/session/1/act?action_type=left_click&x=0&y=0&delay=1" > screen.png
+curl "http://localhost:8000/act?action_type=left_click&x=0&y=0&delay=1" > screen.png
 
 # Get feedback/rewards from session
-curl "http://localhost:8000/session/1/progress"
-
-# Close a session
-curl -X DELETE "http://localhost:8000/session/1"
+curl "http://localhost:8000/progress"
 ```
-
-
-## System Architecture
-
-https://excalidraw.com/#json=-0W_6mgdNnp7NKDoq74ap,d5dL49VYE3HnCk0ulmJikg
