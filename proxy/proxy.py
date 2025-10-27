@@ -1,3 +1,4 @@
+from doctest import debug
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import Response as FastAPIResponse
 from kubernetes import client, config
@@ -63,8 +64,9 @@ async def proxy_request(session_id: str, endpoint: str, request: Request):
 # Cleanup function to close the HTTP client
 @app.on_event("shutdown")
 async def shutdown_event():
+    print("🛑 App shutting down")
     await http_client.aclose()
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    uvicorn.run(app, host='0.0.0.0', port=8000, timeout_keep_alive=20)
