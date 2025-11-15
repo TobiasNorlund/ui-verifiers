@@ -45,6 +45,7 @@ async def act(
     y: int | None = None,
     text: str | None = None,
     keys: str | None = None,
+    direction: str | None = None,
     delay: float = 1.0,
 ):
     """Execute a computer action and return a screenshot"""
@@ -58,6 +59,8 @@ async def act(
         kwargs["text"] = text
     if keys is not None:
         kwargs["keys"] = keys
+    if direction is not None:
+        kwargs["direction"] = direction
 
     res = await computer.act(type=action_type, **kwargs)
     if action_type == computer.ActionType.Screenshot:

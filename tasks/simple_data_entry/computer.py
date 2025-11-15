@@ -16,6 +16,7 @@ class ActionType(enum.StrEnum):
     TripleClick = "triple_click"
     Type = "type"
     Keys = "keys"
+    Scroll = "scroll"
 
 
 async def act(type: ActionType, **kwargs):
@@ -37,6 +38,8 @@ async def act(type: ActionType, **kwargs):
             await type_text(text=kwargs["text"])
         case ActionType.Keys:
             await keys(keys=kwargs["keys"])
+        case ActionType.Scroll:
+            await scroll(direction=kwargs["direction"], x=kwargs.get("x"), y=kwargs.get("y"))
 
 
 async def screenshot():
@@ -125,3 +128,24 @@ async def keys(keys: Union[str, List[str]]):
         raise RuntimeError(f"Failed to press keys {keys}: {e}")
 
 
+async def scroll(direction: str, x: int = None, y: int = None, amount: int = 3):
+    """Scroll in the specified direction
+
+    Args:
+        direction: 'up' or 'down'
+        x: Optional x coordinate to move mouse to before scrolling
+        y: Optional y coordinate to move mouse to before scrolling
+        amount: Number of scroll units (default: 3)
+    """
+    try:
+        # Move mouse to position if coordinates are provided
+        if x is not None and y is not None:
+            await asyncio.to_thread(pyautogui.moveTo, x, y)
+
+        # Scroll up (positive) or down (negative)
+        scroll_amount = amount if direction.lower() == "up" else -amount
+        await asyncio.to_thread(pyautogui.scroll, scroll_amount)
+    except pyautogui.FailSafeException:
+        raise RuntimeError("PyAutoGUI fail-safe triggered")
+    except Exception as e:
+        raise RuntimeError(f"Failed to scroll {direction}: {e}")
