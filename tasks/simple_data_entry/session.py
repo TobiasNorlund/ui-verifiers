@@ -49,7 +49,7 @@ class SimpleDataEntrySession:
 
     def get_progress(self):
         return {
-            "num_correct_submissions": self._form_browser.num_correct_submissions, 
+            "submitted_row_indices": self._form_browser.submitted_row_indices, 
             "num_incorrect_submissions": self._form_browser.num_incorrect_submissions
         }
 
@@ -90,7 +90,7 @@ class FormBrowser:
         self._context = None
         self._page = None
 
-        self.num_correct_submissions = 0
+        self.submitted_row_indices = []
         self.num_incorrect_submissions = 0
 
     async def start(self):
@@ -117,10 +117,8 @@ class FormBrowser:
             l_name = request.post_data_json["entry.277017468"]
             email = request.post_data_json["entry.564455939"]
             matching = self._sde_data[(self._sde_data["First name"] == f_name) & (self._sde_data["Last name"] == l_name) & (self._sde_data["Email"] == email)]
-            # Check submitted data against any row
             if len(matching) > 0:
-                self.last_submitted_row_idx = matching.index[0]
-                self.num_correct_submissions += 1
+                self.submitted_row_indices.append(int(matching.index[0]))
             else:
                 self.num_incorrect_submissions += 1
 
