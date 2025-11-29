@@ -70,7 +70,7 @@ class DataSheetBrowser:
                 'DISPLAY': f':{self._display}',
             }
         )
-        self._context = await self._browser.new_context(no_viewport=True)
+        self._context = await self._browser.new_context(no_viewport=True, locale='en-US')
         self._page = await self._context.new_page()
         await self._page.goto("https://docs.google.com/spreadsheets/d/1wVwDmyx01J5_XSzdgkmxvOOHPLmZmsnq1YJ636XkwIA")
 
@@ -100,9 +100,9 @@ class FormBrowser:
                 'DISPLAY': f':{self._display}',
             }
         )
-        self._context = await self._browser.new_context(no_viewport=True)
+        self._context = await self._browser.new_context(no_viewport=True, locale='en-US')
         self._page = await self._context.new_page()
-        await self._page.goto("https://docs.google.com/forms/d/e/1FAIpQLSef9VSfp3ISD7jr5Kgxq2UDibrT82vUEilN8vIrhCIfH5YfQQ/viewform")
+        await self._page.goto("https://docs.google.com/forms/d/e/1FAIpQLSef9VSfp3ISD7jr5Kgxq2UDibrT82vUEilN8vIrhCIfH5YfQQ/viewform?hl=en")
         self._page.on("request", self._on_form_browser_request)
 
     async def stop(self):
