@@ -24,6 +24,7 @@ run:
 .PHONY: push
 push:
 	docker tag ui-verifiers/proxy europe-north2-docker.pkg.dev/my-project-1726641910410/ui-verifiers/proxy
+	gcloud auth configure-docker europe-north2-docker.pkg.dev
 	docker push europe-north2-docker.pkg.dev/my-project-1726641910410/ui-verifiers/proxy
 
 

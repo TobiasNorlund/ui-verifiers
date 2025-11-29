@@ -19,19 +19,29 @@ http_client = httpx.AsyncClient(
     )
 )
 
+# Cache for session IPs
+session_ip_cache = {}
+
 @app.api_route('/proxy/{session_id}/{endpoint:path}', methods=['GET', 'POST', 'PUT', 'DELETE'])
 async def proxy_request(session_id: str, endpoint: str, request: Request):
     try:
-        # Find the pod using a label selector
-        pod_list = k8s_api.list_namespaced_pod(
-            namespace='default',
-            label_selector=f'session-id={session_id}'
-        )
+        # Check cache first
+        pod_ip = session_ip_cache.get(session_id)
 
-        if not pod_list.items:
-            return FastAPIResponse(content="Pod not found", status_code=404)
+        if pod_ip is None:
+            # Find the pod using a label selector
+            pod_list = k8s_api.list_namespaced_pod(
+                namespace='default',
+                label_selector=f'session-id={session_id}'
+            )
 
-        pod_ip = pod_list.items[0].status.pod_ip
+            if not pod_list.items:
+                return FastAPIResponse(content="Pod not found", status_code=404)
+
+            pod_ip = pod_list.items[0].status.pod_ip
+            # Cache the IP for future requests
+            session_ip_cache[session_id] = pod_ip
+
         pod_port = 8000 # Assuming your API server is on port 8000
 
         # Forward the request to the pod
@@ -58,6 +68,10 @@ async def proxy_request(session_id: str, endpoint: str, request: Request):
             headers=dict(resp.headers)
         )
 
+    except httpx.ConnectError as e:
+        # If connection fails, invalidate cache and return error
+        session_ip_cache.pop(session_id, None)
+        return FastAPIResponse(content=f"Failed to connect to pod: {str(e)}", status_code=502)
     except Exception as e:
         return FastAPIResponse(content=str(e), status_code=500)
 
